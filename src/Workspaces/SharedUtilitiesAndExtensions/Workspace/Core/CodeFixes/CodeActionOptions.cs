@@ -3,7 +3,11 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Runtime.Serialization;
+using Microsoft.CodeAnalysis.ExtractMethod;
+using Microsoft.CodeAnalysis.Formatting;
+using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.ImplementType;
+using Microsoft.CodeAnalysis.Simplification;
 using Microsoft.CodeAnalysis.SymbolSearch;
 
 namespace Microsoft.CodeAnalysis.CodeActions
@@ -20,13 +24,16 @@ namespace Microsoft.CodeAnalysis.CodeActions
     /// Options available to code fixes that are supplied by the IDE (i.e. not stored in editorconfig).
     /// </summary>
     [DataContract]
-    internal readonly record struct CodeActionOptions(
-        [property: DataMember(Order = 0)] SymbolSearchOptions SearchOptions,
-        [property: DataMember(Order = 1)] ImplementTypeOptions ImplementTypeOptions,
-        [property: DataMember(Order = 2)] bool HideAdvancedMembers = false,
-        [property: DataMember(Order = 3)] bool IsBlocking = false,
-        [property: DataMember(Order = 4)] int WrappingColumn = CodeActionOptions.DefaultWrappingColumn)
+    internal readonly record struct CodeActionOptions
     {
+        [DataMember(Order = 0)] public SymbolSearchOptions SearchOptions { get; init; }
+        [DataMember(Order = 1)] public ImplementTypeOptions ImplementTypeOptions { get; init; }
+        [DataMember(Order = 2)] public ExtractMethodOptions ExtractMethodOptions { get; init; }
+        [DataMember(Order = 3)] public SimplifierOptions? SimplifierOptions { get; init; }
+        [DataMember(Order = 4)] public bool HideAdvancedMembers { get; init; }
+        [DataMember(Order = 5)] public bool IsBlocking { get; init; }
+        [DataMember(Order = 6)] public int WrappingColumn { get; init; }
+
         /// <summary>
         /// Default value of 120 was picked based on the amount of code in a github.com diff at 1080p.
         /// That resolution is the most common value as per the last DevDiv survey as well as the latest
@@ -39,9 +46,26 @@ namespace Microsoft.CodeAnalysis.CodeActions
         /// </summary>
         public const int DefaultWrappingColumn = 120;
 
+        public CodeActionOptions(
+            SymbolSearchOptions? SearchOptions = null,
+            ImplementTypeOptions? ImplementTypeOptions = null,
+            ExtractMethodOptions? ExtractMethodOptions = null,
+            SimplifierOptions? SimplifierOptions = null,
+            bool HideAdvancedMembers = false,
+            bool IsBlocking = false,
+            int WrappingColumn = DefaultWrappingColumn)
+        {
+            this.SearchOptions = SearchOptions ?? SymbolSearchOptions.Default;
+            this.ImplementTypeOptions = ImplementTypeOptions ?? ImplementType.ImplementTypeOptions.Default;
+            this.ExtractMethodOptions = ExtractMethodOptions ?? ExtractMethod.ExtractMethodOptions.Default;
+            this.SimplifierOptions = SimplifierOptions;
+            this.HideAdvancedMembers = HideAdvancedMembers;
+            this.IsBlocking = IsBlocking;
+            this.WrappingColumn = WrappingColumn;
+        }
+
         public CodeActionOptions()
-            : this(SearchOptions: SymbolSearchOptions.Default,
-                   ImplementTypeOptions: ImplementTypeOptions.Default)
+            : this(SearchOptions: null)
         {
         }
 
@@ -49,5 +73,5 @@ namespace Microsoft.CodeAnalysis.CodeActions
     }
 #endif
 
-    internal delegate CodeActionOptions CodeActionOptionsProvider(string language);
+    internal delegate CodeActionOptions CodeActionOptionsProvider(HostLanguageServices languageService);
 }

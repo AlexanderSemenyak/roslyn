@@ -118,7 +118,7 @@ namespace Microsoft.CodeAnalysis.SpellCheck
             // -    We believe spell-check should only compare what you have typed to what symbol would be offered here.
             var options = CompletionOptions.Default with
             {
-                HideAdvancedMembers = context.Options.HideAdvancedMembers,
+                HideAdvancedMembers = context.Options(document.Project.LanguageServices).HideAdvancedMembers,
                 SnippetsBehavior = SnippetsRule.NeverInclude,
                 ShowItemsFromUnimportedNamespaces = false,
                 TargetTypedCompletionFilter = false,
@@ -227,6 +227,8 @@ namespace Microsoft.CodeAnalysis.SpellCheck
 
         private class SpellCheckCodeAction : CodeAction.DocumentChangeAction
         {
+            internal override CodeActionPriority Priority => CodeActionPriority.Low;
+
             public SpellCheckCodeAction(string title, Func<CancellationToken, Task<Document>> createChangedDocument, string equivalenceKey)
                 : base(title, createChangedDocument, equivalenceKey)
             {
@@ -235,6 +237,8 @@ namespace Microsoft.CodeAnalysis.SpellCheck
 
         private class MyCodeAction : CodeAction.CodeActionWithNestedActions
         {
+            internal override CodeActionPriority Priority => CodeActionPriority.Low;
+
             public MyCodeAction(string title, ImmutableArray<CodeAction> nestedActions)
                 : base(title, nestedActions, isInlinable: true)
             {
