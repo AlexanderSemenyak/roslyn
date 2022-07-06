@@ -140,7 +140,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Venus
                 subjectBuffer: SubjectBuffer,
                 dataBuffer: DataBuffer,
                 bufferCoordinator,
-                this.Workspace,
+                Workspace,
                 project,
                 componentModel,
                 vbHelperFormattingRule);
@@ -148,6 +148,8 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Venus
             // TODO: Can contained documents be linked or shared?
             this.DataBuffer.Changed += OnDataBufferChanged;
         }
+
+        public IGlobalOptionService GlobalOptions => _diagnosticAnalyzerService.GlobalOptions;
 
         private void OnDisconnect()
         {
@@ -168,10 +170,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Venus
 
             this.ContainedDocument.Dispose();
 
-            if (_bufferTagAggregator != null)
-            {
-                _bufferTagAggregator.Dispose();
-            }
+            _bufferTagAggregator?.Dispose();
         }
 
         private void OnDataBufferChanged(object sender, TextContentChangedEventArgs e)

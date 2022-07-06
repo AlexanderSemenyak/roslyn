@@ -143,8 +143,8 @@ namespace Microsoft.CodeAnalysis.CSharp
         PercentEqualsToken = 8283,
         /// <summary>Represents <c>??=</c> token.</summary>
         QuestionQuestionEqualsToken = 8284,
-        /// <summary>Represents <c>!!</c> token.</summary>
-        ExclamationExclamationToken = 8285,
+        // Don't use 8285. It corresponds to the deleted kind ExclamationExclamationToken which was previously shipped.
+
         /// <summary>Represents <c>&gt;&gt;&gt;</c> token.</summary>
         GreaterThanGreaterThanGreaterThanToken = 8286,
         /// <summary>Represents <c>&gt;&gt;&gt;=</c> token.</summary>
@@ -404,9 +404,15 @@ namespace Microsoft.CodeAnalysis.CSharp
         ManagedKeyword = 8445,
         /// <summary>Represents <see langword="unmanaged"/>.</summary>
         UnmanagedKeyword = 8446,
+        /// <summary>Represents <see langword="required"/>.</summary>
+        RequiredKeyword = 8447,
+        /// <summary>Represents <see langword="scoped"/>.</summary>
+        ScopedKeyword = 8448,
+        /// <summary>Represents <see langword="file"/>.</summary>
+        FileKeyword = 8449,
 
         // when adding a contextual keyword following functions must be adapted:
-        // <see cref="SyntaxFacts.GetContextualKeywordKinds"/>
+        // <see cref="SyntaxFacts.GetContextualKeywordKinds()"/>
         // <see cref="SyntaxFacts.IsContextualKeyword(SyntaxKind)"/>
         // <see cref="SyntaxFacts.GetContextualKeywordKind(string)"/>
         // <see cref="SyntaxFacts.GetText(SyntaxKind)"/>
@@ -502,9 +508,9 @@ namespace Microsoft.CodeAnalysis.CSharp
         SingleLineRawStringLiteralToken = 8518,
         MultiLineRawStringLiteralToken = 8519,
 
-        UTF8StringLiteralToken = 8520,
-        UTF8SingleLineRawStringLiteralToken = 8521,
-        UTF8MultiLineRawStringLiteralToken = 8522,
+        Utf8StringLiteralToken = 8520,
+        Utf8SingleLineRawStringLiteralToken = 8521,
+        Utf8MultiLineRawStringLiteralToken = 8522,
 
         // trivia
         EndOfLineTrivia = 8539,
@@ -674,7 +680,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         FalseLiteralExpression = 8753,
         NullLiteralExpression = 8754,
         DefaultLiteralExpression = 8755,
-        UTF8StringLiteralExpression = 8756,
+        Utf8StringLiteralExpression = 8756,
 
         // primary function expressions
         TypeOfExpression = 8760,

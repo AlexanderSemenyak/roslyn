@@ -13,10 +13,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.DecompiledSource;
 using Microsoft.CodeAnalysis.ErrorReporting;
-using Microsoft.CodeAnalysis.Formatting;
 using Microsoft.CodeAnalysis.Host.Mef;
+using Microsoft.CodeAnalysis.PdbSourceDocument;
 using Microsoft.CodeAnalysis.Shared.Extensions;
-using Microsoft.CodeAnalysis.Simplification;
+using Microsoft.CodeAnalysis.Structure;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 
@@ -30,12 +30,14 @@ namespace Microsoft.CodeAnalysis.MetadataAsSource
         private readonly Dictionary<UniqueDocumentKey, MetadataAsSourceGeneratedFileInfo> _keyToInformation = new();
 
         private readonly Dictionary<string, MetadataAsSourceGeneratedFileInfo> _generatedFilenameToInformation = new(StringComparer.OrdinalIgnoreCase);
+        private readonly IImplementationAssemblyLookupService _implementationAssemblyLookupService;
         private IBidirectionalMap<MetadataAsSourceGeneratedFileInfo, DocumentId> _openedDocumentIds = BidirectionalMap<MetadataAsSourceGeneratedFileInfo, DocumentId>.Empty;
 
         [ImportingConstructor]
         [Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
-        public DecompilationMetadataAsSourceFileProvider()
+        public DecompilationMetadataAsSourceFileProvider(IImplementationAssemblyLookupService implementationAssemblyLookupService)
         {
+            _implementationAssemblyLookupService = implementationAssemblyLookupService;
         }
 
         public async Task<MetadataAsSourceFile?> GetGeneratedFileAsync(Workspace workspace, Project project, ISymbol symbol, bool signaturesOnly, MetadataAsSourceOptions options, string tempPath, CancellationToken cancellationToken)
@@ -52,7 +54,7 @@ namespace Microsoft.CodeAnalysis.MetadataAsSource
             // If the assembly wants to suppress decompilation we respect that
             if (useDecompiler)
             {
-                useDecompiler = !symbol.ContainingAssembly.GetAttributes().Any(attribute => attribute.AttributeClass?.Name == nameof(SuppressIldasmAttribute)
+                useDecompiler = !symbol.ContainingAssembly.GetAttributes().Any(static attribute => attribute.AttributeClass?.Name == nameof(SuppressIldasmAttribute)
                     && attribute.AttributeClass.ToNameDisplayString() == typeof(SuppressIldasmAttribute).FullName);
             }
 
@@ -79,9 +81,6 @@ namespace Microsoft.CodeAnalysis.MetadataAsSource
                 var temporaryDocument = workspace.CurrentSolution.AddProject(temporaryProjectInfoAndDocumentId.Item1)
                                                                  .GetRequiredDocument(temporaryProjectInfoAndDocumentId.Item2);
 
-                var formattingOptions = await SyntaxFormattingOptions.FromDocumentAsync(temporaryDocument, cancellationToken).ConfigureAwait(false);
-                var simplifierOptions = await SimplifierOptions.FromDocumentAsync(temporaryDocument, options.SimplifierOptions, cancellationToken).ConfigureAwait(false);
-
                 if (useDecompiler)
                 {
                     try
@@ -93,7 +92,15 @@ namespace Microsoft.CodeAnalysis.MetadataAsSource
 
                         if (decompiledSourceService != null)
                         {
-                            temporaryDocument = await decompiledSourceService.AddSourceToAsync(temporaryDocument, compilation, symbol, refInfo.metadataReference, refInfo.assemblyLocation, formattingOptions, cancellationToken).ConfigureAwait(false);
+                            var decompilationDocument = await decompiledSourceService.AddSourceToAsync(temporaryDocument, compilation, symbol, refInfo.metadataReference, refInfo.assemblyLocation, options.GenerationOptions.CleanupOptions.FormattingOptions, cancellationToken).ConfigureAwait(false);
+                            if (decompilationDocument is not null)
+                            {
+                                temporaryDocument = decompilationDocument;
+                            }
+                            else
+                            {
+                                useDecompiler = false;
+                            }
                         }
                         else
                         {
@@ -109,7 +116,7 @@ namespace Microsoft.CodeAnalysis.MetadataAsSource
                 if (!useDecompiler)
                 {
                     var sourceFromMetadataService = temporaryDocument.Project.LanguageServices.GetRequiredService<IMetadataAsSourceService>();
-                    temporaryDocument = await sourceFromMetadataService.AddSourceToAsync(temporaryDocument, compilation, symbol, formattingOptions, simplifierOptions, cancellationToken).ConfigureAwait(false);
+                    temporaryDocument = await sourceFromMetadataService.AddSourceToAsync(temporaryDocument, compilation, symbol, options.GenerationOptions, cancellationToken).ConfigureAwait(false);
                 }
 
                 // We have the content, so write it out to disk
@@ -153,7 +160,7 @@ namespace Microsoft.CodeAnalysis.MetadataAsSource
             var documentName = string.Format(
                 "{0} [{1}]",
                 topLevelNamedType.Name,
-                FeaturesResources.from_metadata);
+                useDecompiler ? FeaturesResources.Decompiled : FeaturesResources.from_metadata);
 
             var documentTooltip = topLevelNamedType.ToDisplayString(new SymbolDisplayFormat(typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces));
 
@@ -165,12 +172,11 @@ namespace Microsoft.CodeAnalysis.MetadataAsSource
             var metadataReference = compilation.GetMetadataReference(containingAssembly);
             var assemblyLocation = (metadataReference as PortableExecutableReference)?.FilePath;
 
-            var isReferenceAssembly = containingAssembly.GetAttributes().Any(attribute => attribute.AttributeClass?.Name == nameof(ReferenceAssemblyAttribute)
-                && attribute.AttributeClass.ToNameDisplayString() == typeof(ReferenceAssemblyAttribute).FullName);
+            var isReferenceAssembly = MetadataAsSourceHelpers.IsReferenceAssembly(containingAssembly);
 
             if (assemblyLocation is not null &&
                 isReferenceAssembly &&
-                !MetadataAsSourceHelpers.TryGetImplementationAssemblyPath(assemblyLocation, out assemblyLocation))
+                !_implementationAssemblyLookupService.TryFindImplementationAssemblyPath(assemblyLocation, out assemblyLocation))
             {
                 try
                 {
@@ -206,6 +212,18 @@ namespace Microsoft.CodeAnalysis.MetadataAsSource
                                                              .GetRequiredDocument(temporaryProjectInfoAndDocumentId.Item2);
 
             return await MetadataAsSourceHelpers.GetLocationInGeneratedSourceAsync(symbolId, temporaryDocument, cancellationToken).ConfigureAwait(false);
+        }
+
+        public bool ShouldCollapseOnOpen(string filePath, BlockStructureOptions blockStructureOptions)
+        {
+            if (_generatedFilenameToInformation.TryGetValue(filePath, out var info))
+            {
+                return info.SignaturesOnly
+                    ? blockStructureOptions.CollapseEmptyMetadataImplementationsWhenFirstOpened
+                    : blockStructureOptions.CollapseMetadataImplementationsWhenFirstOpened;
+            }
+
+            return false;
         }
 
         public bool TryAddDocumentToWorkspace(Workspace workspace, string filePath, SourceTextContainer sourceTextContainer)

@@ -40,6 +40,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGeneration
 
         internal override SyntaxTrivia ElasticCarriageReturnLineFeed => SyntaxFactory.ElasticCarriageReturnLineFeed;
         internal override SyntaxTrivia CarriageReturnLineFeed => SyntaxFactory.CarriageReturnLineFeed;
+        internal override SyntaxTrivia ElasticMarker => SyntaxFactory.ElasticMarker;
 
         internal override bool RequiresExplicitImplementationForInterfaceMembers => false;
 
@@ -1376,6 +1377,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGeneration
             DeclarationModifiers.Const |
             DeclarationModifiers.New |
             DeclarationModifiers.ReadOnly |
+            DeclarationModifiers.Required |
             DeclarationModifiers.Static |
             DeclarationModifiers.Unsafe |
             DeclarationModifiers.Volatile;
@@ -1405,6 +1407,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGeneration
             DeclarationModifiers.New |
             DeclarationModifiers.Override |
             DeclarationModifiers.ReadOnly |
+            DeclarationModifiers.Required |
             DeclarationModifiers.Sealed |
             DeclarationModifiers.Static |
             DeclarationModifiers.Virtual |
@@ -1444,23 +1447,26 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGeneration
             DeclarationModifiers.Partial |
             DeclarationModifiers.Sealed |
             DeclarationModifiers.Static |
-            DeclarationModifiers.Unsafe;
+            DeclarationModifiers.Unsafe |
+            DeclarationModifiers.File;
 
         private static readonly DeclarationModifiers s_recordModifiers =
             DeclarationModifiers.Abstract |
             DeclarationModifiers.New |
             DeclarationModifiers.Partial |
             DeclarationModifiers.Sealed |
-            DeclarationModifiers.Unsafe;
+            DeclarationModifiers.Unsafe |
+            DeclarationModifiers.File;
 
         private static readonly DeclarationModifiers s_structModifiers =
             DeclarationModifiers.New |
             DeclarationModifiers.Partial |
             DeclarationModifiers.ReadOnly |
             DeclarationModifiers.Ref |
-            DeclarationModifiers.Unsafe;
+            DeclarationModifiers.Unsafe |
+            DeclarationModifiers.File;
 
-        private static readonly DeclarationModifiers s_interfaceModifiers = DeclarationModifiers.New | DeclarationModifiers.Partial | DeclarationModifiers.Unsafe;
+        private static readonly DeclarationModifiers s_interfaceModifiers = DeclarationModifiers.New | DeclarationModifiers.Partial | DeclarationModifiers.Unsafe | DeclarationModifiers.File;
         private static readonly DeclarationModifiers s_accessorModifiers = DeclarationModifiers.Abstract | DeclarationModifiers.New | DeclarationModifiers.Override | DeclarationModifiers.Virtual;
 
         private static readonly DeclarationModifiers s_localFunctionModifiers =
@@ -1483,10 +1489,10 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGeneration
                     return s_classModifiers;
 
                 case SyntaxKind.EnumDeclaration:
-                    return DeclarationModifiers.New;
+                    return DeclarationModifiers.New | DeclarationModifiers.File;
 
                 case SyntaxKind.DelegateDeclaration:
-                    return DeclarationModifiers.New | DeclarationModifiers.Unsafe;
+                    return DeclarationModifiers.New | DeclarationModifiers.Unsafe | DeclarationModifiers.File;
 
                 case SyntaxKind.InterfaceDeclaration:
                     return s_interfaceModifiers;
@@ -1657,6 +1663,9 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGeneration
 
             if (modifiers.IsExtern)
                 list.Add(SyntaxFactory.Token(SyntaxKind.ExternKeyword));
+
+            if (modifiers.IsRequired)
+                list.Add(SyntaxFactory.Token(SyntaxKind.RequiredKeyword));
 
             // partial and ref must be last
             if (modifiers.IsRef)
@@ -3487,6 +3496,9 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGeneration
 
         internal override SyntaxNode ScopeBlock(IEnumerable<SyntaxNode> statements)
             => SyntaxFactory.Block(statements.Cast<StatementSyntax>());
+
+        internal override SyntaxNode GlobalStatement(SyntaxNode statement)
+            => SyntaxFactory.GlobalStatement((StatementSyntax)statement);
 
         public override SyntaxNode ValueReturningLambdaExpression(IEnumerable<SyntaxNode>? parameterDeclarations, SyntaxNode expression)
         {

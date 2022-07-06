@@ -1273,13 +1273,33 @@ namespace Microsoft.CodeAnalysis.CSharp
             AliasSymbol aliasOpt;
             var attributeType = (NamedTypeSymbol)enclosingBinder.BindType(attribute.Name, BindingDiagnosticBag.Discarded, out aliasOpt).Type;
 
+            // For attributes where a nameof could introduce some type parameters, we need to track the attribute target
+            Symbol attributeTarget = getAttributeTarget(attribute.Parent.Parent);
+
             return AttributeSemanticModel.Create(
                 this,
                 attribute,
                 attributeType,
                 aliasOpt,
+                attributeTarget,
                 enclosingBinder.WithAdditionalFlags(BinderFlags.AttributeArgument),
                 containingModel?.GetRemappedSymbols());
+
+            Symbol getAttributeTarget(SyntaxNode targetSyntax)
+            {
+                return targetSyntax switch
+                {
+                    BaseMethodDeclarationSyntax or
+                        LocalFunctionStatementSyntax or
+                        ParameterSyntax or
+                        TypeParameterSyntax or
+                        IndexerDeclarationSyntax or
+                        AccessorDeclarationSyntax or
+                        DelegateDeclarationSyntax => GetDeclaredSymbolForNode(targetSyntax).GetSymbol(),
+                    AnonymousFunctionExpressionSyntax anonymousFunction => GetSymbolInfo(anonymousFunction).Symbol.GetSymbol(),
+                    _ => null
+                };
+            }
         }
 
         private FieldSymbol GetDeclaredFieldSymbol(VariableDeclaratorSyntax variableDecl)
@@ -1683,6 +1703,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 case SyntaxKind.ClassDeclaration:
                 case SyntaxKind.EnumDeclaration:
                 case SyntaxKind.RecordDeclaration:
+                case SyntaxKind.RecordStructDeclaration:
                     return ((BaseTypeDeclarationSyntax)declaration).Identifier.ValueText;
 
                 case SyntaxKind.VariableDeclarator:
